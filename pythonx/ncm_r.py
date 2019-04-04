@@ -17,6 +17,16 @@ import rlang  # pylint: disable=E0401
 from omnils import add_snippet_var_inside_brackets
 
 
+def only_first(func):
+    cache = {}
+    def wrap(self, message):
+        if message not in cache:
+            func(self, message)
+            cache[message] = 1
+    return wrap
+
+
+
 class Source(Rsource):  # pylint: disable=R0902
     """Completion Manager Source for R language"""
 
@@ -36,6 +46,10 @@ class Source(Rsource):  # pylint: disable=R0902
         self.get_nvimr_settings()
         self.get_all_pkg_matches()
 
+    @only_first
+    def error(self, message):
+        self._error(message)
+
     def get_nvimr_settings(self):
         """Get Nvim-R settings to read completion files"""
 
@@ -44,7 +58,7 @@ class Source(Rsource):  # pylint: disable=R0902
             self._settings['nvimr_tmp'] = self.nvim.eval('g:rplugin_tmpdir')
             self._settings['nvimr_cmp'] = self.nvim.eval('g:rplugin_compldir')
         except NvimError:
-            self._error('Can\'t load Nvim-R options. '
+            self.error('Can\'t load Nvim-R options. '
                         'Did you install the Nvim-R plugin?')
 
         self._info("NVIMR_ID: {}, tmp: {}, cmp: {}".format(
@@ -60,7 +74,7 @@ class Source(Rsource):  # pylint: disable=R0902
             self.get_nvimr_settings()
 
             if self._settings['nvimr_id'] == '':
-                self._error('Can\'t find $NVIMR_ID. '
+                self.error('Can\'t find $NVIMR_ID. '
                             'Please start R using Nvim-R '
                             '(default mapping: <localleader>rf).')
                 return False
@@ -81,7 +95,7 @@ class Source(Rsource):  # pylint: disable=R0902
             pkg_loaded = self.nvim.eval('g:rplugin_loaded_libs')
             self._pkg_loaded = list(reversed(pkg_loaded))
         except NvimError:
-            self._error('Can\'t find loaded R packages. '
+            self.error('Can\'t find loaded R packages. '
                         'Please start R using Nvim-R '
                         '(default mapping: <localleader>rf).')
             raise
@@ -153,11 +167,11 @@ class Source(Rsource):  # pylint: disable=R0902
 
             self._pkg_matches.extend(self.matches.from_pkg_desc(descriptions))
         except FileNotFoundError:
-            self._error('Can\'t find completion files. Please load the '
+            self.error('Can\'t find completion files. Please load the '
                         'R packages you need (e.g. "base" or "utils").')
             raise
         except Exception as error:
-            self._error('Could not load completion data', error)
+            self.error('Could not load completion data', error)
             raise
 
     def get_data_matches(self):
